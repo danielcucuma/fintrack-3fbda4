@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String?  @map("password_hash")
+  name          String?
+  timezone      String   @default("UTC")
+  currency      String   @default("USD")
+  emailVerified Boolean  @default(false) @map("email_verified")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  transactions  Transaction[]
+  budgets       Budget[]
+  bankAccounts  BankAccount[]
+  sessions      Session[]
+  oauthAccounts OAuthAccount[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model OAuthAccount {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  provider  String   // "google" | "github"
+  providerAccountId String @map("provider_account_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  amount      Float
+  category    String   // "income" | "food" | "transport" | "utilities" | "other"
+  description String?
+  date        DateTime
+  type        String   // "income" | "expense"
+  accountId   String   @map("account_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([date])
+  @@map("transactions")
+}
+
+model Budget {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  category    String   // same as transaction categories
+  limitAmount Float    @map("limit_amount")
+  period      String   @default("monthly") // "monthly" | "yearly"
+  month       Int?
+  year        Int?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, month, year])
+  @@index([userId])
+  @@map("budgets")
+}
+
+model BankAccount {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  plaidAccountId  String?  @map("plaid_account_id")
+  accountName     String   @map("account_name")
+  balance         Float    @default(0)
+  lastSync        DateTime? @map("last_sync")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+  @@map("bank_accounts")
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  userId               String   @unique @map("user_id")
+  stripeCustomerId     String   @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?  @unique @map("stripe_subscription_id")
+  stripePriceId        String?  @map("stripe_price_id")
+  plan                 String   @default("free") // "free" | "starter" | "professional"
+  status               String   @default("active") // "active" | "canceled" | "past_due"
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  cancelAtPeriodEnd    Boolean  @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("subscriptions")
+}
