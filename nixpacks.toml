@@ -5,7 +5,7 @@ nixPkgs = ["nodejs_20"]
 cmds = ["npm install --legacy-peer-deps"]
 
 [phases.build]
-cmds = ["npx prisma generate", "npx next build"]
+cmds = ["npx prisma generate", "npx tailwindcss -i ./app/globals.css -o ./app/globals-compiled.css --minify", "npx next build"]
 
 [start]
 cmd = "npx prisma db push --accept-data-loss && node .next/standalone/server.js || npx next start"
