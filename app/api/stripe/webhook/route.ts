@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import prisma from "@/lib/db";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY\!);
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET\!;
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
-  const signature = req.headers.get("stripe-signature")!;
+  const signature = req.headers.get("stripe-signature")\!;
 
   let event: Stripe.Event;
   try {
@@ -26,17 +26,19 @@ export async function POST(req: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
 
-        const user = await prisma.user.findFirst({
+        const sub = await prisma.subscription.findFirst({
           where: { stripeCustomerId: customerId },
         });
 
-        if (user) {
-          await prisma.user.update({
-            where: { id: user.id },
+        if (sub) {
+          await prisma.subscription.update({
+            where: { id: sub.id },
             data: {
-              plan:
-                subscription.items.data[0]?.price.nickname || "free",
+              plan: subscription.items.data[0]?.price.nickname || "free",
               stripeSubscriptionId: subscription.id,
+              status: subscription.status,
+              currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+              cancelAtPeriodEnd: subscription.cancel_at_period_end,
             },
           });
         }
@@ -47,14 +49,14 @@ export async function POST(req: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
 
-        const user = await prisma.user.findFirst({
+        const sub = await prisma.subscription.findFirst({
           where: { stripeCustomerId: customerId },
         });
 
-        if (user) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { plan: "free", stripeSubscriptionId: null },
+        if (sub) {
+          await prisma.subscription.update({
+            where: { id: sub.id },
+            data: { plan: "free", stripeSubscriptionId: null, status: "canceled" },
           });
         }
         break;
